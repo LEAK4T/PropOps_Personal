@@ -1,0 +1,26 @@
+name = "propops-sandbox-api"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 database — create with:
+#   wrangler d1 create propops_sandbox
+# then paste the printed database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "propops_sandbox"
+database_id = "4c2244b7-0afa-4dad-a303-1b0aca513da6"
+
+# Workers AI — used for the lease auto-scan (OCR/field extraction).
+# No separate account needed: this runs on your existing Cloudflare account.
+[ai]
+binding = "AI"
+
+# Non-secret config. Secrets (API keys/tokens) are set separately with
+# `wrangler secret put <NAME>` — never put them here or commit them.
+[vars]
+ALLOWED_ORIGIN = "http://localhost:3000"
+DOCUSIGN_BASE_URL = "https://demo.docusign.net"
+TWILIO_FROM_NUMBER = "+17372324091"
+TWILIO_FROM_EMAIL = "ACf631b1b36656feb049760de2b4f5747d@twilio.email"
+GOOGLE_PLACE_ID = ""

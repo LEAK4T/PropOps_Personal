@@ -1,0 +1,24 @@
+{
+  "name": "propops-ai-sandbox",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PropOps AI — personal live sandbox. Same dashboard as the client demo, plus a Live Sandbox tab wired to real Twilio/Resend/DocuSign/Google Reviews/Workers AI through the propops-sandbox-api Worker.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "deploy": "next build && wrangler deploy"
+  },
+  "dependencies": {
+    "lucide-react": "0.383.0",
+    "next": "^14.2.35",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "autoprefixer": "10.4.19",
+    "postcss": "8.4.38",
+    "tailwindcss": "3.4.4",
+    "wrangler": "3.80.0"
+  }
+}
