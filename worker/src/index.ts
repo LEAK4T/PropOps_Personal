@@ -4,6 +4,15 @@ import { fetchReviews, getCachedReviews } from './reviews';
 import { sendLeaseForSignature, sendVendorContractForSignature, docusignWebhook, docusignStatus } from './docusign';
 import { scanLease } from './leasescan';
 import {
+  listLoans, upsertLoan,
+  listExpenses, createExpense,
+  listDeposits, createDeposit, closeDeposit,
+  listUnitTurns, createUnitTurn,
+  contributeCapexReserve,
+  financialsSummary,
+} from './financials';
+import { handleSmsWebhook, listSmsConversations } from './sms_triage';
+import {
   listProperties, createProperty,
   listUnits, createUnit,
   listTenants, createTenant,
@@ -73,6 +82,26 @@ export default {
       if (pathname === '/api/maintenance' && method === 'POST') return await createMaintenance(request, env);
 
       if (pathname === '/api/messages' && method === 'GET') return await listMessages(request, env);
+
+      if (pathname === '/api/loans' && method === 'GET') return await listLoans(request, env);
+      if (pathname === '/api/loans' && method === 'POST') return await upsertLoan(request, env);
+
+      if (pathname === '/api/expenses' && method === 'GET') return await listExpenses(request, env);
+      if (pathname === '/api/expenses' && method === 'POST') return await createExpense(request, env);
+
+      if (pathname === '/api/deposits' && method === 'GET') return await listDeposits(request, env);
+      if (pathname === '/api/deposits' && method === 'POST') return await createDeposit(request, env);
+      if (pathname === '/api/deposits/close' && method === 'POST') return await closeDeposit(request, env);
+
+      if (pathname === '/api/unit-turns' && method === 'GET') return await listUnitTurns(request, env);
+      if (pathname === '/api/unit-turns' && method === 'POST') return await createUnitTurn(request, env);
+
+      if (pathname === '/api/capex-reserve/contribute' && method === 'POST') return await contributeCapexReserve(request, env);
+
+      if (pathname === '/api/financials/summary' && method === 'GET') return await financialsSummary(request, env);
+
+      if (pathname === '/api/sms/webhook' && method === 'POST') return await handleSmsWebhook(request, env);
+      if (pathname === '/api/sms/conversations' && method === 'GET') return await listSmsConversations(request, env);
 
       return json({ ok: false, error: `No route for ${method} ${pathname}` }, env, { status: 404 });
     } catch (err: any) {

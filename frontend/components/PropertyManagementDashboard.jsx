@@ -292,6 +292,103 @@ export default function PropertyManagementDashboard() {
     }
   };
 
+  // --- Live Sandbox: Financial model (loan, expenses, CapEx reserve, deposits, vacancy) ---
+  const [financialsSummary, setFinancialsSummary] = useState(null);
+  const [financialsLoading, setFinancialsLoading] = useState(false);
+  const [financialsError, setFinancialsError] = useState(null);
+  const refreshFinancialsSummary = async () => {
+    setFinancialsLoading(true); setFinancialsError(null);
+    try {
+      const data = await callApi(`/api/financials/summary?propertyId=${encodeURIComponent(selectedPropertyId)}`);
+      if (data.ok) setFinancialsSummary(data); else setFinancialsError(data.message || data.error);
+    } catch (err) { setFinancialsError(String(err?.message || err)); }
+    finally { setFinancialsLoading(false); }
+  };
+  useEffect(() => { if (API_BASE) refreshFinancialsSummary(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [selectedPropertyId]);
+
+  const [loanForm, setLoanForm] = useState({ lender: '', principalBalance: '', interestRate: '', monthlyPayment: '', escrowTaxMonthly: '', escrowInsuranceMonthly: '' });
+  const [loanSaving, setLoanSaving] = useState(false);
+  const [loanResult, setLoanResult] = useState(null);
+  const saveLoan = async () => {
+    setLoanSaving(true); setLoanResult(null);
+    try {
+      const data = await callApi('/api/loans', {
+        body: {
+          propertyId: selectedPropertyId,
+          lender: loanForm.lender || null,
+          principalBalance: Number(loanForm.principalBalance) || 0,
+          interestRate: Number(loanForm.interestRate) || null,
+          monthlyPayment: Number(loanForm.monthlyPayment) || 0,
+          escrowTaxMonthly: Number(loanForm.escrowTaxMonthly) || 0,
+          escrowInsuranceMonthly: Number(loanForm.escrowInsuranceMonthly) || 0,
+        },
+      });
+      setLoanResult(data);
+      if (data.ok) refreshFinancialsSummary();
+    } catch (err) { setLoanResult({ ok: false, error: String(err?.message || err) }); }
+    finally { setLoanSaving(false); }
+  };
+
+  const [expenseForm, setExpenseForm] = useState({ category: '', classification: 'opex', amount: '', description: '' });
+  const [expenseSaving, setExpenseSaving] = useState(false);
+  const [expenseResult, setExpenseResult] = useState(null);
+  const saveExpense = async () => {
+    setExpenseSaving(true); setExpenseResult(null);
+    try {
+      const data = await callApi('/api/expenses', {
+        body: {
+          propertyId: selectedPropertyId,
+          category: expenseForm.category,
+          classification: expenseForm.classification,
+          amount: Number(expenseForm.amount) || 0,
+          description: expenseForm.description || null,
+        },
+      });
+      setExpenseResult(data);
+      if (data.ok) { refreshFinancialsSummary(); setExpenseForm({ category: '', classification: 'opex', amount: '', description: '' }); }
+    } catch (err) { setExpenseResult({ ok: false, error: String(err?.message || err) }); }
+    finally { setExpenseSaving(false); }
+  };
+
+  const [reserveAmount, setReserveAmount] = useState('');
+  const [reserveSaving, setReserveSaving] = useState(false);
+  const [reserveResult, setReserveResult] = useState(null);
+  const contributeToReserve = async () => {
+    setReserveSaving(true); setReserveResult(null);
+    try {
+      const data = await callApi('/api/capex-reserve/contribute', { body: { propertyId: selectedPropertyId, amount: Number(reserveAmount) || 0 } });
+      setReserveResult(data);
+      if (data.ok) { refreshFinancialsSummary(); setReserveAmount(''); }
+    } catch (err) { setReserveResult({ ok: false, error: String(err?.message || err) }); }
+    finally { setReserveSaving(false); }
+  };
+
+  const [depositUnitId, setDepositUnitId] = useState('');
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositSaving, setDepositSaving] = useState(false);
+  const [depositResult, setDepositResult] = useState(null);
+  const saveDeposit = async () => {
+    setDepositSaving(true); setDepositResult(null);
+    try {
+      const data = await callApi('/api/deposits', { body: { unitId: depositUnitId, amountHeld: Number(depositAmount) || 0 } });
+      setDepositResult(data);
+      if (data.ok) { refreshFinancialsSummary(); setDepositAmount(''); }
+    } catch (err) { setDepositResult({ ok: false, error: String(err?.message || err) }); }
+    finally { setDepositSaving(false); }
+  };
+
+  // --- Live Sandbox: SMS diagnostic-triage conversations ---
+  const [smsConversations, setSmsConversations] = useState(null);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
+  const refreshConversations = async () => {
+    setConversationsLoading(true);
+    try {
+      const data = await callApi('/api/sms/conversations');
+      if (data.ok) setSmsConversations(data.conversations || []);
+    } catch { /* non-fatal, leave prior state */ }
+    finally { setConversationsLoading(false); }
+  };
+
   // ============================================================
   // ALL MOCK DATA, KEYED BY PROPERTY
   // ============================================================
@@ -1437,6 +1534,140 @@ export default function PropertyManagementDashboard() {
                         {scanSaveResult.ok ? `Saved to D1 as unit ${scanSaveResult.unitId}` : (scanSaveResult.message || scanSaveResult.error)}
                       </div>
                     )}
+                  </div>
+                )}
+              </div>
+
+              {/* FINANCIAL SUMMARY — NOI/cash flow, excludes depreciation & taxable income by design */}
+              <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl lg:col-span-2">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="font-semibold text-white text-sm flex items-center gap-2"><CircleDollarSign size={15} className="text-indigo-400" /> Financial Summary</h3>
+                  <button onClick={refreshFinancialsSummary} disabled={financialsLoading} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white disabled:opacity-50">
+                    <RefreshCw size={13} className={financialsLoading ? 'animate-spin' : ''} /> Refresh
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400 mb-3">NOI and cash flow for {current.label.split(' (')[0]}. Deliberately excludes depreciation and taxable-income math — talk to a tax professional for those.</p>
+                {financialsError && (
+                  <div className="p-3 rounded-lg text-xs bg-rose-500/10 text-rose-300 border border-rose-500/25 mb-3">{financialsError}</div>
+                )}
+                {financialsSummary && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                      <p className="text-[11px] text-slate-500">Gross Scheduled Rent</p>
+                      <p className="text-sm font-semibold text-white mt-1">${financialsSummary.grossScheduledRent?.toLocaleString()}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                      <p className="text-[11px] text-slate-500">Total OpEx</p>
+                      <p className="text-sm font-semibold text-white mt-1">${financialsSummary.totalOpex?.toLocaleString()}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
+                      <p className="text-[11px] text-emerald-300/80">NOI</p>
+                      <p className="text-sm font-semibold text-emerald-300 mt-1">${financialsSummary.noi?.toLocaleString()}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                      <p className="text-[11px] text-slate-500">Monthly Debt Service</p>
+                      <p className="text-sm font-semibold text-white mt-1">${financialsSummary.monthlyDebtService?.toLocaleString()}</p>
+                    </div>
+                    <div className={`p-3 rounded-xl border ${financialsSummary.cashFlowBeforeCapex >= 0 ? 'bg-emerald-500/10 border-emerald-500/25' : 'bg-rose-500/10 border-rose-500/25'}`}>
+                      <p className={`text-[11px] ${financialsSummary.cashFlowBeforeCapex >= 0 ? 'text-emerald-300/80' : 'text-rose-300/80'}`}>Cash Flow (pre-CapEx)</p>
+                      <p className={`text-sm font-semibold mt-1 ${financialsSummary.cashFlowBeforeCapex >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>${financialsSummary.cashFlowBeforeCapex?.toLocaleString()}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                      <p className="text-[11px] text-slate-500">CapEx Reserve Balance</p>
+                      <p className="text-sm font-semibold text-white mt-1">${financialsSummary.capexReserveBalance?.toLocaleString()}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                      <p className="text-[11px] text-slate-500">Deposits Held (liability)</p>
+                      <p className="text-sm font-semibold text-white mt-1">${financialsSummary.depositsHeldLiability?.toLocaleString()}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                      <p className="text-[11px] text-slate-500">Avg Vacancy Days</p>
+                      <p className="text-sm font-semibold text-white mt-1">{financialsSummary.avgVacancyDays ?? '—'}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 pt-4 border-t border-slate-800">
+                  {/* Loan details */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-slate-300 mb-2">Loan Details</h4>
+                    <input value={loanForm.lender} onChange={(e) => setLoanForm((f) => ({ ...f, lender: e.target.value }))} placeholder="Lender" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 mb-1.5" />
+                    <input type="number" value={loanForm.principalBalance} onChange={(e) => setLoanForm((f) => ({ ...f, principalBalance: e.target.value }))} placeholder="Principal balance" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 mb-1.5" />
+                    <input type="number" value={loanForm.interestRate} onChange={(e) => setLoanForm((f) => ({ ...f, interestRate: e.target.value }))} placeholder="Interest rate %" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 mb-1.5" />
+                    <input type="number" value={loanForm.monthlyPayment} onChange={(e) => setLoanForm((f) => ({ ...f, monthlyPayment: e.target.value }))} placeholder="Monthly P&I" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 mb-1.5" />
+                    <input type="number" value={loanForm.escrowTaxMonthly} onChange={(e) => setLoanForm((f) => ({ ...f, escrowTaxMonthly: e.target.value }))} placeholder="Escrow — tax / mo" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 mb-1.5" />
+                    <input type="number" value={loanForm.escrowInsuranceMonthly} onChange={(e) => setLoanForm((f) => ({ ...f, escrowInsuranceMonthly: e.target.value }))} placeholder="Escrow — insurance / mo" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 mb-2" />
+                    <button onClick={saveLoan} disabled={loanSaving} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-2 rounded-lg text-xs font-medium">
+                      {loanSaving ? 'Saving...' : 'Save Loan'}
+                    </button>
+                    {loanResult && <p className={`text-[11px] mt-1.5 ${loanResult.ok ? 'text-emerald-400' : 'text-rose-400'}`}>{loanResult.ok ? 'Saved' : (loanResult.message || loanResult.error)}</p>}
+                  </div>
+
+                  {/* Log a CapEx/OpEx expense */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-slate-300 mb-2">Log an Expense</h4>
+                    <input value={expenseForm.category} onChange={(e) => setExpenseForm((f) => ({ ...f, category: e.target.value }))} placeholder="Category (e.g. roof repair)" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 mb-1.5" />
+                    <select value={expenseForm.classification} onChange={(e) => setExpenseForm((f) => ({ ...f, classification: e.target.value }))} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 mb-1.5">
+                      <option value="opex">OpEx (operating)</option>
+                      <option value="capex">CapEx (capital)</option>
+                    </select>
+                    <input type="number" value={expenseForm.amount} onChange={(e) => setExpenseForm((f) => ({ ...f, amount: e.target.value }))} placeholder="Amount" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 mb-1.5" />
+                    <input value={expenseForm.description} onChange={(e) => setExpenseForm((f) => ({ ...f, description: e.target.value }))} placeholder="Description (optional)" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 mb-2" />
+                    <button onClick={saveExpense} disabled={expenseSaving || !expenseForm.category || !expenseForm.amount} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-2 rounded-lg text-xs font-medium">
+                      {expenseSaving ? 'Saving...' : 'Log Expense'}
+                    </button>
+                    {expenseResult && <p className={`text-[11px] mt-1.5 ${expenseResult.ok ? 'text-emerald-400' : 'text-rose-400'}`}>{expenseResult.ok ? 'Logged' : (expenseResult.message || expenseResult.error)}</p>}
+
+                    <h4 className="text-xs font-semibold text-slate-300 mb-2 mt-4">CapEx Reserve Contribution</h4>
+                    <div className="flex gap-1.5">
+                      <input type="number" value={reserveAmount} onChange={(e) => setReserveAmount(e.target.value)} placeholder="Amount" className="flex-1 bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200" />
+                      <button onClick={contributeToReserve} disabled={reserveSaving || !reserveAmount} className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-3 rounded-lg text-xs font-medium shrink-0">Add</button>
+                    </div>
+                    {reserveResult && <p className={`text-[11px] mt-1.5 ${reserveResult.ok ? 'text-emerald-400' : 'text-rose-400'}`}>{reserveResult.ok ? 'Added to reserve' : (reserveResult.message || reserveResult.error)}</p>}
+                  </div>
+
+                  {/* Deposits held */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-slate-300 mb-2">Record a Held Deposit</h4>
+                    <select value={depositUnitId} onChange={(e) => setDepositUnitId(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 mb-1.5">
+                      <option value="">Select {current.unitLabel.toLowerCase()}...</option>
+                      {current.unitLedger.map((u) => (<option key={u.id} value={u.id}>{current.unitLabel} {u.id} — {u.tenant}</option>))}
+                    </select>
+                    <input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="Amount held" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 mb-2" />
+                    <button onClick={saveDeposit} disabled={depositSaving || !depositUnitId || !depositAmount} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-2 rounded-lg text-xs font-medium">
+                      {depositSaving ? 'Saving...' : 'Record Deposit'}
+                    </button>
+                    {depositResult && <p className={`text-[11px] mt-1.5 ${depositResult.ok ? 'text-emerald-400' : 'text-rose-400'}`}>{depositResult.ok ? 'Recorded (held as liability)' : (depositResult.message || depositResult.error)}</p>}
+                    <p className="text-[11px] text-slate-500 mt-2">Held deposits are tracked as a liability, never counted as revenue. Closing out a deposit at move-out (return vs. withhold) is available via the API (<code className="bg-slate-900/60 px-1 rounded">/api/deposits/close</code>) — a UI for that can be added once you're handling real move-outs.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* SMS DIAGNOSTIC TRIAGE */}
+              <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-2xl lg:col-span-2">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="font-semibold text-white text-sm flex items-center gap-2"><MessageSquare size={15} className="text-indigo-400" /> SMS Diagnostic Triage</h3>
+                  <button onClick={refreshConversations} disabled={conversationsLoading} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white disabled:opacity-50">
+                    <RefreshCw size={13} className={conversationsLoading ? 'animate-spin' : ''} /> Refresh
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400 mb-3">When a tenant texts your Twilio number with a complaint, this asks one clarifying question (e.g. "AC is broken" → thermostat dial vs. the unit itself) before a maintenance ticket is created — all over SMS, no extra vendor needed. Point your Twilio number's "A message comes in" webhook at <code className="bg-slate-950/60 px-1.5 py-0.5 rounded text-[11px]">{API_BASE || '<your-worker-url>'}/api/sms/webhook</code> to turn this on.</p>
+                {(!smsConversations || smsConversations.length === 0) ? (
+                  <p className="text-xs text-slate-500">{smsConversations ? 'No SMS conversations yet — text your Twilio number to try it.' : 'Click Refresh to load recent diagnostic conversations.'}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {smsConversations.slice(0, 8).map((c) => (
+                      <div key={c.id} className="p-3 bg-slate-950 border border-slate-800 rounded-lg text-xs">
+                        <div className="flex items-center justify-between">
+                          <p className="text-slate-200 font-medium">{c.phone_number}</p>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] ${c.status === 'closed' ? 'bg-emerald-500/10 text-emerald-300' : c.status === 'expired' ? 'bg-slate-700 text-slate-400' : 'bg-amber-500/10 text-amber-300'}`}>{c.status}</span>
+                        </div>
+                        <p className="text-slate-400 mt-1">Reported: "{c.initial_complaint}"</p>
+                        {c.clarifying_question && <p className="text-slate-500 mt-0.5">Asked: "{c.clarifying_question}"</p>}
+                        {c.clarifying_answer && <p className="text-slate-500 mt-0.5">Answer: "{c.clarifying_answer}"</p>}
+                        {c.resulting_maintenance_id && <p className="text-indigo-400 mt-0.5">→ Maintenance ticket {c.resulting_maintenance_id}</p>}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

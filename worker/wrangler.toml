@@ -19,7 +19,7 @@ binding = "AI"
 # Non-secret config. Secrets (API keys/tokens) are set separately with
 # `wrangler secret put <NAME>` — never put them here or commit them.
 [vars]
-ALLOWED_ORIGIN = "http://localhost:3000"
+ALLOWED_ORIGIN = "https://propops-personal.michaelb40012.workers.dev"
 DOCUSIGN_BASE_URL = "https://demo.docusign.net"
 TWILIO_FROM_NUMBER = "+17372324091"
 TWILIO_FROM_EMAIL = "ACf631b1b36656feb049760de2b4f5747d@twilio.email"
